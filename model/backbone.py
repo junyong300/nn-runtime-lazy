@@ -171,7 +171,6 @@ def get_plan(backbone, name):
         body['tail']            = backbone
         body['tail_start']      = 1
         body['tail_end']        = 2
-        print(backbone)
 
     elif 'mobilenet' in name:
         e = len(backbone.features)
