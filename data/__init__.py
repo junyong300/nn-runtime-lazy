@@ -48,7 +48,7 @@ def get_dataset(cfg):
                 (0.2673, 0.2564, 0.2761))
             
         transform_train = transforms.Compose([
-            transforms.Resize((cfg['img_size'], cfg['img_size'])),
+            transforms.Resize(cfg['img_size']),
             transforms.AutoAugment(policy=transforms.AutoAugmentPolicy.CIFAR10),
             transforms.ToTensor(),
             normalize])
@@ -59,17 +59,52 @@ def get_dataset(cfg):
             normalize])
 
         trainset = torchvision.datasets.CIFAR100(
-            root = cfg['data_dir'], 
+            root = cfg['data-dir'], 
             train=True, 
             download=True, 
             transform=transform_train)
 
         testset = torchvision.datasets.CIFAR100(
-            root = cfg['data_dir'], 
+            root = cfg['data-dir'], 
             train=False, 
             download=True, 
             transform=transform_test)
-    
+
+    elif cfg['dataset']  == "imagenet":
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                  std=[0.229, 0.224, 0.225])
+        imagenet_transforms = transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
+        ])
+            
+        transform_train = transforms.Compose([
+            transforms.Resize((cfg['img_size'], cfg['img_size'])),
+            transforms.AutoAugment(policy=transforms.AutoAugmentPolicy.CIFAR10),
+            transforms.ToTensor(),
+            normalize])
+
+        transform_test = transforms.Compose([
+            transforms.Resize((cfg['img_size'], cfg['img_size'])),
+            transforms.ToTensor(),
+            normalize])
+
+        # trainset = torchvision.datasets.CIFAR100(
+        #     root = cfg['data-dir'], 
+        #     train=True, 
+        #     download=True, 
+        #     transform=transform_train)
+
+        # testset = torchvision.datasets.CIFAR100(
+        #     root = cfg['data-dir'], 
+        #     train=False, 
+        #     download=True, 
+        #     transform=transform_test)
+
+
+
     if trainset != None and testset != None:
         trl, val, tel = get_dataloader(cfg, trainset, testset)
         return trl, val, tel
@@ -85,6 +120,6 @@ def get_dataloader(cfg, trainset, testset):
 
     testloader = torch.utils.data.DataLoader(
         testset, batch_size = 1, shuffle=False,
-        num_workers=cfg['workers'], pin_memory=True)
+        num_workers=32, pin_memory=True)
 
     return trainloader, valloader, testloader

@@ -26,7 +26,7 @@ class LazyNet(nn.Module):
 
         # Backbone Config
         self.bb_name    = cfg['backbone']
-        self.lazy_num   = cfg['lazy_num']
+        self.lazy_num   = cfg['lazy_num'] + 1
         backbone        = get_backbone(cfg)
         plan            = get_plan(backbone, cfg['backbone'])
         
@@ -41,11 +41,15 @@ class LazyNet(nn.Module):
 
         self.construct(backbone, head_list, mid_list, tail_list)
 
-        # Set Spatial Analysis
-        self.spatial    = Spatial(cfg)
 
-        self.train      = True
-        
+
+        # Train Mode set
+        self.train_mode = True
+        self.temperature= nn.Parameter(
+            torch.Tensor([1]), requires_grad=False)
+
+        self.exit_list = torch.zeros(self.lazy_num+2)
+
     def construct(self, backbone, head_list, mid_list, tail_list):
         """construct lazy parts using plan"""
         id = 0
@@ -53,16 +57,22 @@ class LazyNet(nn.Module):
         input = torch.randn(1, 3, self.cfg['img_size'], self.cfg['img_size'])
         # Create Head layers
         self.head_layer = nn.Sequential(*head_list)
+        self.feats_layers = nn.ModuleList([])
+        self.skip_layers  = nn.ModuleList([])
+
         input = self.head_layer(input)
+        # self.skip_layers.append(Skips(cfg=self.cfg, input=input, id=id))
+        
+        # Set Spatial Analysis
+        self.spatial    = Spatial(input, self.cfg).to(self.device)
+
 
         # Create Mid Layers
         print('---------------------------------------------------')
-        self.feats_layers = nn.ModuleList([])
-        self.skip_layers  = nn.ModuleList([])
         print("split feats={}, using N={} Lazy Entries"
-              .format(len(mid_list), N))
-        if N == 1:
-            N += 1            
+              .format(len(mid_list), N-1))
+        # if N == 1:
+        #     N += 1            
         div = len(mid_list) / N
         div = int(div)
         print("divide size:", div)
@@ -103,7 +113,7 @@ class LazyNet(nn.Module):
         self.ff_layer = FeatureFusion(input.shape, reduction=2)
 
         self.tail_layers = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),
+            # nn.AdaptiveAvgPool2d(1),
             nn.Flatten(),
             nn.Linear(
                 self.cfg['__fc_features__'], self.cfg['num_class'], bias=True)
@@ -111,12 +121,13 @@ class LazyNet(nn.Module):
         # input = self.tail_layers(input)
         # return input
 
-    def forward(self, input):
-        # Spatial Analysis
-        repr, logits = self.spatial(input)
+    def train_forward(self, input):
         
         # Head Inference
         x = self.head_layer(input)
+
+        # Spatial Analysis
+        repr, logits = self.spatial(x)
 
         # Mid Inference
         ss = []
@@ -136,43 +147,71 @@ class LazyNet(nn.Module):
             val = self.ff_layer(s_iter, repr)
             val = self.tail_layers(val)
             vals.append(val)
-        return repr, logits, vals
-
-    # def forward(self, input):
-    #     print("[init] input:\t",input.shape)
-    #     repr, logits = self.spatial(input)
-    #     print("[spac] repr:\t",repr.shape)
-
-    #     x = self.head_layer(input)
-    #     print('[head]x.shape:\t',x.shape)
-
-    #     ss = []
-
-    #     for i, (feat, skip) in enumerate(
-    #         zip(self.feats_layers, self.skip_layers)):
-    #         print('[feat#'+str(i)+']pre-x:\t',x.shape)
-    #         x = feat(x)
-    #         print('[feat#'+str(i)+']post-x:\t',x.shape)
-    #         s = skip(x)
-    #         ss.append(s)
-    #         print('[skip#'+str(i)+']post-x:\t',s.shape)
         
-    #     for fetc in self.fetc_layers:
-    #         print('[fetc]pre-x:\t',x.shape)
-    #         x = fetc(x)
-    #         print('[fetc]post-x:\t',x.shape)
+        val = self.ff_layer(x, repr)
+        val = self.tail_layers(val)
+        vals.append(val)
+        return vals, logits
 
-    #     vals = []
+    def test_forward(self, input):
+        # Head Inference
+        x = self.head_layer(input)
 
-    #     for s_iter in ss:
-    #         val = self.ff_layer(s_iter, x)
-    #         val = self.tail_layers(val)
-    #         vals.append(val)
-    #     return vals
-    #     # val = self.ff_layer(s, x)
-    #     # print('[ffm]val.shape:\t',val.shape)
+        # Spatial Analysis
+        repr, logits = self.spatial(x)
+        scaled = F.softmax(
+            torch.div(logits, self.temperature), dim=1)
+        conf, pred = torch.max(scaled, dim=1)
 
-    #     # val = self.tail_layers(x)
-    #     # print('[tail]val.shape:\t',val.shape)
+        skip_idx = 0
+        
+        try:
+            thresholds = self.cfg['thresholds']
 
-    #     # return val  
+        except:
+            thresholds = [0.85, 0.65, 0, 0, 0]
+            # thresholds = [0, 0, 0, 0, 0]
+            # thresholds = [1, 1, 1, 1, 0]
+            # thresholds = [0, 1, 1, 1, 1]
+            # thresholds = [1, 0, 1, 1, 1]
+            
+        if conf > thresholds[0]:
+            self.exit_list[0] += 1
+            return scaled
+
+        for n in range(self.lazy_num+1):
+            if conf < thresholds[n] and conf > thresholds[n+1]:
+                self.exit_list[n+1] += 1
+                skip_idx = n
+            
+
+
+        # Mid Inference
+        for i, (feat, skip) in enumerate(
+            zip(self.feats_layers, self.skip_layers)):
+            x = feat(x)
+            if i == skip_idx:
+                s = skip(x)
+                break
+
+        val = []
+        if skip_idx < 3:
+            val = self.ff_layer(s, repr)
+            val = self.tail_layers(val)
+            
+        # Fetc Inference
+        if skip_idx >= 3:
+            for fetc in self.fetc_layers:
+                x = fetc(x)
+            val = self.ff_layer(x, repr)
+            val = self.tail_layers(val)
+            
+        return val
+
+    def forward(self, input):
+        if self.train_mode:
+            vals, logits = self.train_forward(input)
+            return vals, logits
+        else:
+            pred = self.test_forward(input)
+            return pred
