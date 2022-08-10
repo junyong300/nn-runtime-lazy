@@ -51,13 +51,13 @@ class LazyNet(nn.Module):
         id = 0
         N = self.lazy_num
         input = torch.randn(1, 3, self.cfg['img_size'], self.cfg['img_size'])
+
         # Create Head layers
         self.head_layer = nn.Sequential(*head_list)
         self.feats_layers = nn.ModuleList([])
         self.skip_layers  = nn.ModuleList([])
 
         input = self.head_layer(input)
-        # self.skip_layers.append(Skips(cfg=self.cfg, input=input, id=id))
         
         # Set Spatial Analysis
         self.spatial    = Spatial(input, self.cfg).to(self.device)
@@ -66,8 +66,6 @@ class LazyNet(nn.Module):
         print('---------------------------------------------------')
         print("split feats={}, using N={} Lazy Entries"
               .format(len(mid_list), N-1))
-        # if N == 1:
-        #     N += 1            
         div = len(mid_list) / N
         div = int(div)
         print("divide size:", div)
@@ -110,8 +108,7 @@ class LazyNet(nn.Module):
         self.tail_layers = nn.Sequential(
             nn.Flatten(),
             nn.Linear(
-                self.cfg['__fc_features__'], self.cfg['num_class'], bias=True)
-        )
+                self.cfg['__fc_features__'], self.cfg['num_class'], bias=True))
 
     def train_forward(self, input):
         """Forward Train function"""
@@ -175,8 +172,6 @@ class LazyNet(nn.Module):
             if conf < thresholds[n] and conf > thresholds[n+1]:
                 self.exit_list[n+1] += 1
                 skip_idx = n
-            
-
 
         # Mid Inference
         for i, (feat, skip) in enumerate(
@@ -190,17 +185,17 @@ class LazyNet(nn.Module):
         if skip_idx < 3:
             val = self.ff_layer(s, repr)
             val = self.tail_layers(val)
-            
+
         # Fetc Inference
         if skip_idx >= 3:
             for fetc in self.fetc_layers:
                 x = fetc(x)
             val = self.ff_layer(x, repr)
             val = self.tail_layers(val)
-            
         return val
 
     def forward(self, input):
+        """Forward function"""
         if self.train_mode:
             vals, logits = self.train_forward(input)
             return vals, logits
