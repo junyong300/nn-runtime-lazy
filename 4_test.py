@@ -31,7 +31,7 @@ class Trainer():
     def __init__(self, cfg):
         # Init config
         self.cfg = cfg
-        self.device = torch.device(cfg['device'])
+        self.device = torch.device(cfg['t_device'])
         
         # Get Dataset
         loaders = get_dataset(cfg)
@@ -50,7 +50,7 @@ class Trainer():
         self.model.eval()
         self.model.train_mode=False
         pbar = tqdm(self.test_loader)
-        epochs = 2000
+        epochs = 10000
 
         # Start validation
         total = 0
@@ -71,7 +71,7 @@ class Trainer():
             pbar.set_description(
                 "[{}]:accc:{:.2f}%".format(
                     self.cfg['mode'], correct*100/total))
-            if i == 2000:
+            if i == 10000:
                 break
 
         latency = time.time() - start_time

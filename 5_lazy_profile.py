@@ -64,7 +64,7 @@ class Trainer():
             # print(prof.key_averages().table(sort_by="cuda_time_total"))
 
             with profile(
-                activities=[ProfilerActivity.CUDA],
+                activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
                 record_shapes=True, profile_memory=True) as prof:
                 with record_function("model_inference"):
                     self.model(images)
@@ -76,7 +76,7 @@ class Trainer():
             #     activities=[ProfilerActivity.CPU], 
             #     profile_memory=True, record_shapes=True) as prof:
             #     self.model(input)
-            if i == 1:
+            if i == 1000:
                 break
         print(
             prof.key_averages().table(
