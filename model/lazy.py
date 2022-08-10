@@ -113,7 +113,7 @@ class LazyNet(nn.Module):
         self.ff_layer = FeatureFusion(input.shape, reduction=2)
 
         self.tail_layers = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),
+            # nn.AdaptiveAvgPool2d(1),
             nn.Flatten(),
             nn.Linear(
                 self.cfg['__fc_features__'], self.cfg['num_class'], bias=True)
