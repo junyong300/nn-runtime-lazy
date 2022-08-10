@@ -18,7 +18,7 @@ class LazyNet(nn.Module):
         super().__init__()
         # Init configuration file
         self.cfg = cfg
-        
+
         # Data config
         self.num_class  = cfg['num_class']
         self.img_size   = cfg['img_size']
@@ -41,13 +41,9 @@ class LazyNet(nn.Module):
 
         self.construct(backbone, head_list, mid_list, tail_list)
 
-
-
         # Train Mode set
         self.train_mode = True
-        self.temperature= nn.Parameter(
-            torch.Tensor([1]), requires_grad=False)
-
+        self.temperature= nn.Parameter(torch.Tensor([1]), requires_grad=False)
         self.exit_list = torch.zeros(self.lazy_num+2)
 
     def construct(self, backbone, head_list, mid_list, tail_list):
@@ -65,7 +61,6 @@ class LazyNet(nn.Module):
         
         # Set Spatial Analysis
         self.spatial    = Spatial(input, self.cfg).to(self.device)
-
 
         # Create Mid Layers
         print('---------------------------------------------------')
@@ -113,16 +108,13 @@ class LazyNet(nn.Module):
         self.ff_layer = FeatureFusion(input.shape, reduction=2)
 
         self.tail_layers = nn.Sequential(
-            # nn.AdaptiveAvgPool2d(1),
             nn.Flatten(),
             nn.Linear(
                 self.cfg['__fc_features__'], self.cfg['num_class'], bias=True)
         )
-        # input = self.tail_layers(input)
-        # return input
 
     def train_forward(self, input):
-        
+        """Forward Train function"""
         # Head Inference
         x = self.head_layer(input)
 

@@ -11,20 +11,13 @@ import torch.nn.functional as F
 class CBRelu(nn.Module):
     """Block module class"""
     def __init__(
-        self, in_channels, out_channels, kernel_size,
-        stride=1, padding=0, dilation=1, groups=1):
+        self, in_channels, out_channels, kernel_size, stride=1, padding=0, 
+        dilation=1, groups=1):
         """init function"""
-        super(CBRelu, self).__init__()
-        self.conv = nn.Conv2d(
-            in_channels,
-            out_channels,
-            kernel_size,
-            stride,
-            padding,
-            dilation,
-            groups,
-            bias=False
-        )
+        super().__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride,
+            padding, dilation, groups, bias=False)
+        
         self.bn = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU(inplace=True)
     
